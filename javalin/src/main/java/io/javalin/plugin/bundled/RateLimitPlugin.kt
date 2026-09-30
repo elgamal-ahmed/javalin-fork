@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
-import io.javalin.http.Header
 
 class RateLimitPlugin(userConfig: Consumer<Config>? = null) : ContextPlugin<RateLimitPlugin.Config, RateLimitPlugin.Extension>(userConfig, Config()) {
 
@@ -22,12 +21,18 @@ class RateLimitPlugin(userConfig: Consumer<Config>? = null) : ContextPlugin<Rate
     class Config {
         /**
          * Function to extract the rate limit key from the context.
-         * Default: ip + method + matched endpoint path
+         * Default: ip + method + matched endpoint path.
+         *
+         * The IP comes from [Context.ip], so it is whatever
+         * [io.javalin.config.ContextResolverConfig.ip] resolves. When running behind a proxy,
+         * configure that resolver to derive the client address from the proxy's headers,
+         * otherwise every client behind the proxy shares one counter. Take the entry your
+         * outermost trusted proxy appended, typically the last one, never the first, since
+         * clients can prepend arbitrary entries to a forwarding header.
          */
         var keyFunction: (Context) -> String = { ctx ->
-            val ip = ctx.header(Header.X_FORWARDED_FOR)?.split(",")?.get(0) ?: ctx.ip()
             val path = ctx.endpoints().matchedHttpEndpoint()?.path ?: ctx.endpoint().path
-            ip + ctx.method() + path
+            ctx.ip() + ctx.method() + path
         }
 
         var executorName: String = "JavalinRateLimitExecutor"
